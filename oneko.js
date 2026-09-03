@@ -1,4 +1,4 @@
-// oneko.js: https://github.com/adryd325/oneko.js
+// oneko.js: https://github.com/StargazingNeko/oneko.js (original: https://github.com/adryd325/oneko.js)
 
 (function oneko() {
   const isReducedMotion =
@@ -9,10 +9,13 @@
 
   const nekoEl = document.createElement("div");
   let persistPosition = true;
+  let chaseMode = false;
 
   let nekoPosX = 32;
   let nekoPosY = 32;
-  
+  let startPosX = nekoPosX;
+  let startPosY = nekoPosY;
+
   let mousePosX = 0;
   let mousePosY = 0;
 
@@ -20,6 +23,10 @@
   let idleTime = 0;
   let idleAnimation = null;
   let idleAnimationFrame = 0;
+
+  let diffX;
+  let diffY;
+  let distance;
 
   const nekoSpeed = 10;
   const spriteSets = {
@@ -98,7 +105,7 @@
         persistPosition = JSON.parse(curScript.dataset.persistPosition.toLowerCase());
       }
     }
-  
+
     if (persistPosition) {
       let storedNeko = JSON.parse(window.localStorage.getItem("oneko"));
       if (storedNeko !== null) {
@@ -113,27 +120,32 @@
         nekoEl.style.backgroundPosition = storedNeko.bgPos;
       }
     }
-  
+
     nekoEl.id = "oneko";
     nekoEl.ariaHidden = true;
     nekoEl.style.width = "32px";
     nekoEl.style.height = "32px";
     nekoEl.style.position = "fixed";
-    nekoEl.style.pointerEvents = "none";
+    nekoEl.style.pointerEvents = "pointerup";
     nekoEl.style.imageRendering = "pixelated";
     nekoEl.style.left = `${nekoPosX - 16}px`;
     nekoEl.style.top = `${nekoPosY - 16}px`;
     nekoEl.style.zIndex = 2147483647;
 
     nekoEl.style.backgroundImage = `url(${nekoFile})`;
-    
+
     document.body.appendChild(nekoEl);
+
+    nekoEl.style.cursor = "pointer";
+    nekoEl.addEventListener("click", function () {
+      chaseMode = !chaseMode;
+    });
 
     document.addEventListener("mousemove", function (event) {
       mousePosX = event.clientX;
       mousePosY = event.clientY;
     });
-    
+
     if (persistPosition) {
       window.addEventListener("beforeunload", function (event) {
         window.localStorage.setItem("oneko", JSON.stringify({
@@ -149,7 +161,7 @@
         }));
       });
     }
-    
+
     window.requestAnimationFrame(onAnimationFrame);
   }
 
@@ -204,7 +216,7 @@
       }
       idleAnimation =
         avalibleIdleAnimations[
-          Math.floor(Math.random() * avalibleIdleAnimations.length)
+        Math.floor(Math.random() * avalibleIdleAnimations.length)
         ];
     }
 
@@ -236,11 +248,58 @@
     idleAnimationFrame += 1;
   }
 
+  function UpdateDirection() {
+    if (chaseMode) {
+      diffX = nekoPosX - mousePosX;
+      diffY = nekoPosY - mousePosY;
+    }
+    else {
+      diffX = nekoPosX - startPosX;
+      diffY = nekoPosY - startPosY;
+    }
+    distance = Math.sqrt(diffX ** 2 + diffY ** 2);
+
+    let direction = "";
+    direction += diffY / distance > 0.5 ? "N" : "";
+    direction += diffY / distance < -0.5 ? "S" : "";
+    direction += diffX / distance > 0.5 ? "W" : "";
+    direction += diffX / distance < -0.5 ? "E" : "";
+    setSprite(direction, frameCount);
+  }
+
   function frame() {
     frameCount += 1;
-    const diffX = nekoPosX - mousePosX;
-    const diffY = nekoPosY - mousePosY;
-    const distance = Math.sqrt(diffX ** 2 + diffY ** 2);
+
+    if (!chaseMode) {
+      const diffX = nekoPosX - startPosX;
+      const diffY = nekoPosY - startPosY;
+      const distance = Math.sqrt(diffX ** 2 + diffY ** 2);
+
+      if (distance < 15) {
+        nekoPosX = startPosX;
+        nekoPosY = startPosY;
+        idle();
+      } else {
+
+        UpdateDirection()
+
+        resetIdleAnimation();
+        idleTime = 0;
+
+        const moveX = (diffX / distance) * nekoSpeed;
+        const moveY = (diffY / distance) * nekoSpeed;
+
+        nekoPosX -= moveX;
+        nekoPosY -= moveY;
+
+      }
+
+      nekoEl.style.left = `${nekoPosX - 16}px`;
+      nekoEl.style.top = `${nekoPosY - 16}px`;
+      return;
+    }
+
+    UpdateDirection();
 
     if (distance < nekoSpeed || distance < 48) {
       idle();
@@ -258,12 +317,7 @@
       return;
     }
 
-    let direction;
-    direction = diffY / distance > 0.5 ? "N" : "";
-    direction += diffY / distance < -0.5 ? "S" : "";
-    direction += diffX / distance > 0.5 ? "W" : "";
-    direction += diffX / distance < -0.5 ? "E" : "";
-    setSprite(direction, frameCount);
+    UpdateDirection();
 
     nekoPosX -= (diffX / distance) * nekoSpeed;
     nekoPosY -= (diffY / distance) * nekoSpeed;
