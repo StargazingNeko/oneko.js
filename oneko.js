@@ -28,7 +28,7 @@
   let diffY;
   let distance;
 
-  const nekoSpeed = 10;
+  const nekoSpeed = 20;
   const spriteSets = {
     idle: [[-3, -3]],
     alert: [[-7, -3]],
